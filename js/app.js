@@ -64,7 +64,17 @@ const galleryItems = [
     description: "Lighthouse Coast Sea",
   },
 ];
-const gallery = document.querySelector(".gallery.js-gallery");
+
+// Объект с ссылками на HTML элементы
+const refs = {
+  gallery: document.querySelector(".gallery.js-gallery"),
+  modal: document.querySelector(".lightbox"),
+  modalCloseBtn: document.querySelector('[data-action="close-lightbox"]'),
+  modalImage: document.querySelector(".lightbox__image"),
+  lightboxOverlay: document.querySelector(".lightbox__overlay"),
+};
+
+//Создает HTML строку из массива imageArray <li><a><image></image></a></li>
 const createItemsString = (
   imageArray,
   liClassName,
@@ -89,7 +99,8 @@ const createItemsString = (
     ""
   );
 };
-gallery.insertAdjacentHTML(
+//Создаем HTML элементы для галлереи
+refs.gallery.insertAdjacentHTML(
   "afterbegin",
   createItemsString(
     galleryItems,
@@ -98,17 +109,115 @@ gallery.insertAdjacentHTML(
     "gallery__image"
   )
 );
-// galleryItems.forEach(({ preview, original, description }) => {
-//   itemsString;
-// });
-//
 
-// let listItems = galleryItems.map(({ preview, original, description }) => {
-//   let li = document.createElement("li");
-//   li.classList.add("photo-item");
-//   let imgString = `<img src="${url}" alt="${alt}" >`;
-//   li.insertAdjacentHTML("afterbegin", imgString);
+//Изменяет текущий атрибут src и alt для картинки в модальном окне
+const setModalImg = (newImgSrc = "", alt = "") => {
+  refs.modalImage.setAttribute("src", `${newImgSrc}`);
+  refs.modalImage.setAttribute("alt", `${alt}`);
+};
 
-//   return li;
-// });
-// gallery.append(...listItems);
+/////////////Создаем Обьект который хранит текущий li элемент
+const listElemObj = {
+  currentListEl: "",
+
+  //Возращает ссылку на картинку из элемента списка
+  getImageAttr(liElement) {
+    let image = liElement.querySelector(".gallery__image");
+
+    return {
+      src: image.getAttribute("data-source"),
+      alt: image.getAttribute("alt"),
+    };
+  },
+  getImageSrc(liElement) {
+    return liElement.querySelector(".gallery__link").getAttribute("href");
+  },
+
+  //Возращает ссылку на следующую картинку,в direction (направление в котором двигаемся) передаем next или previous
+  getNextImageAttr(direction) {
+    let nextListEl = this.getNextListEl(direction);
+
+    let nextImgAttr;
+    if (!nextListEl) {
+      //Исключение на случай, если элемент будет крайний
+      switch (direction) {
+        case "next":
+          nextListEl = this.getFirstListEl();
+          break;
+        case "previous":
+          nextListEl = this.getLastListEl();
+          break;
+        default:
+          return;
+      }
+    }
+    nextImgAttr = this.getImageAttr(nextListEl);
+    this.setCurrentLi(nextListEl);
+    return nextImgAttr;
+  },
+  //Изменяем текущий элемент списка
+  setCurrentLi(newListEl) {
+    this.currentListEl = newListEl;
+  },
+  // возращает следующий элемент списка
+  getNextListEl(direction) {
+    return this.currentListEl[`${direction}ElementSibling`];
+  },
+  //возращает первый элемент списка
+  getFirstListEl() {
+    return refs.gallery.firstElementChild;
+  },
+  //возращает последний элемент списка
+  getLastListEl() {
+    return refs.gallery.lastElementChild;
+  },
+};
+//открытие модального окна
+const openModal = (event) => {
+  //Сбрасываем дефолтные обработчики событий
+  event.preventDefault();
+
+  listElemObj.setCurrentLi(event.target.closest("li"));
+  //Проверяем элемент на котором был клик
+  if (event.target.nodeName !== "IMG") {
+    return;
+  }
+  setModalImg(event.target.dataset.source, event.target.getAttribute("alt"));
+  refs.modal.classList.add("is-open");
+};
+
+// закрытие модального окна
+const closeModal = () => {
+  refs.modal.classList.remove("is-open");
+  listElemObj.setCurrentLi("");
+  setModalImg("", "");
+};
+
+refs.modalCloseBtn.addEventListener("click", () => {
+  closeModal();
+});
+refs.gallery.addEventListener("click", (event) => {
+  openModal(event);
+});
+refs.lightboxOverlay.addEventListener("click", closeModal);
+window.addEventListener("keydown", (event) => {
+  ///
+  if (refs.modal.classList.contains("is-open")) {
+    let newImgAttr;
+    switch (event.code) {
+      case "Escape":
+        closeModal();
+        break;
+      case "ArrowRight":
+        newImgAttr = listElemObj.getNextImageAttr("next");
+        setModalImg(newImgAttr.src, newImgAttr.alt);
+        break;
+      case "ArrowLeft":
+        newImgAttr = listElemObj.getNextImageAttr("previous");
+        setModalImg(newImgAttr.src, newImgAttr.alt);
+        break;
+      default:
+        return;
+    }
+  }
+});
